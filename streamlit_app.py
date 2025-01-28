@@ -1,26 +1,69 @@
-import streamlit as st
 import pandas as pd
 import os, json
+import random
 
+import streamlit as st
 import streamlit_survey as ss
 from streamlit_gsheets import GSheetsConnection
 
 # -----------------------------------------------------------------------------
 # Declare some useful functions.
 
-def get_characteristics_options(char):
-    characteristic_options_dict = {
-        "Photography Genre": ["Architectural", "Candid", "Staged", "Portrait", "Selfie", "Group", "Product", "Fashion", "Beauty", "Bridal", "Interior", "Street", "Landscape", "Sky", "Still-life", "Action", "Underwater", "Botanical", "Historical", "Amateur", "Abstract", "Live stage"],
-        "Clothing Style": ["Casual", "Athletic", "Formal", "Business", "Swimwear", "Business casual", "Traditional", "Protective", "Beachwear", "Costume", "Form fitting"],
-        "Gaze": ["Forward", "Downward", "Sideways", "Away", "Upward", "Outward", "Engaged"],
-        "Posing": ["Standing", "Seated", "Holding", "Leaning", "Active", "Reclined", "Walking", "Stretching", "Dynamic", "Running", "Relaxed", "Confident"],
-        "Hair Style": ["Short", "Covered", "Wavy", "Loose", "Varied", "Straight", "Neat", "Ponytail", "Casual", "Tied back", "Flowing", "Curly", "Updo", "Pulled back", "Braided"],
-        "Image Lighting": ["Bright", "Dark", "Moderate", "Studio", "Natural", "Soft", "Hard", "Light glare", "Vignette", "Colored", "Light on subject"],
-        "Depth": ["Wide angle shot", "Mid shot", "Close up shot", "Macro shot", "Motion blur", "Radial blur", "Gaussian blur", "Fully focused subject", "Unfocused subject", "Partly focused subject", "Bokeh effect", "Isolated focal point", "Multiple focal points", "Bright focal point", "Dark focal point", "Shallow depth of field"],
-        "Visible Body Section": ["Upper body", "Full body", "Hand only", "Lower half", "Close up", "Midsection", "Full back", "Head shot"],
-        "Perspective": ["Bird eye view", "Worm eye view", "Fish eye view", "Panorama view", "Centered composition", "Rule of third", "Altered perspective", "Framed image", "High angle photo", "Low angle photo", "Vertical composition", "Corner shot", "Point of view shot", "Audience perspective"]
-    }
-    return characteristic_options_dict[char]
+NUM_IMAGES_TO_SAMPLE = 5
+FORMAL_CHARACTERISTIC_NAMES = {
+    "image_lighting": "Image Lighting",
+    "perspective": "Perspective",
+    "image_background": "Image Background",
+    "colors": "Color Palette",
+    "photography_genre": "Photography Genre",
+    "concept": "Concept",
+    "depth": "Depth",
+    "image_effects": "Image Effects",
+    "hair_style": "Hair Style",
+    "facial_expression": "Facial Expression",
+    "clothing_style": "Clothing Style",
+    "clothing_color_palette": "Clothing Color Palette",
+    "posing": "Posing",
+    "gaze": "Gaze",
+    "visible_body_section": "Visible Body Section"
+}
+CHARACTERISTIC_OPTIONS_DICT = {
+    "Photography Genre": ["Architectural", "Candid", "Staged", "Portrait", "Selfie", "Group", "Product", "Fashion", "Beauty", "Bridal", "Interior", "Street", "Landscape", "Sky", "Still-life", "Action", "Underwater", "Botanical", "Historical", "Amateur", "Abstract", "Live stage"],
+    "Clothing Style": ["Casual", "Athletic", "Formal", "Business", "Swimwear", "Business casual", "Traditional", "Protective", "Beachwear", "Costume", "Form fitting"],
+    "Gaze": ["Forward", "Downward", "Sideways", "Away", "Upward", "Outward", "Engaged"],
+    "Posing": ["Standing", "Seated", "Holding", "Leaning", "Active", "Reclined", "Walking", "Stretching", "Dynamic", "Running", "Relaxed", "Confident"],
+    "Hair Style": ["Short", "Covered", "Wavy", "Loose", "Varied", "Straight", "Neat", "Ponytail", "Casual", "Tied back", "Flowing", "Curly", "Updo", "Pulled back", "Braided"],
+    "Image Lighting": ["Bright", "Dark", "Moderate", "Studio", "Natural", "Soft", "Hard", "Light glare", "Vignette", "Colored", "Light on subject"],
+    "Depth": ["Wide angle shot", "Mid shot", "Close up shot", "Macro shot", "Motion blur", "Radial blur", "Gaussian blur", "Fully focused subject", "Unfocused subject", "Partly focused subject", "Bokeh effect", "Isolated focal point", "Multiple focal points", "Bright focal point", "Dark focal point", "Shallow depth of field"],
+    "Visible Body Section": ["Upper body", "Full body", "Hand only", "Lower half", "Close up", "Midsection", "Full back", "Head shot"],
+    "Perspective": ["Bird eye view", "Worm eye view", "Fish eye view", "Panorama view", "Centered composition", "Rule of third", "Altered perspective", "Framed image", "High angle photo", "Low angle photo", "Vertical composition", "Corner shot", "Point of view shot", "Audience perspective"],
+    "Image Background": ["Solid", "Pattern", "Gradient", "Background as frame", "Textured", "Wood", "Blurred", "Transparent", "Bright", "Dark", "Light"],
+    "Color Palette": ["Grayscale", "Monotone", "Two tone", "Bright colors", "Pastel colors", "Complementary colors", "Analogous colors", "Inverted colors", "Galaxy colors", "Aquatic colors", "Sunset colors", "Autumnal colors"],
+    "Concept": ["Illustration", "Photorealism", "Typography", "Vintage", "Graphic design", "Cartoon", "Incomplete art", "Wave pattern", "Text heavy"],
+    "Image Effects": ["Short exposure", "Long exposure", "Neutral density filter", "Artificial shadow", "Silhouette", "Pixelated image", "Vanishing point", "Negative space", "Motion capture", "Cut-out", "Symmetric", "Asymmetry", "Low saturation", "High saturation", "Low contrast", "High contrast"],
+    "Facial Expression": ["Engaged", "Content", "Focused", "Neutral", "Joyful", "Relaxed", "Contemplative"],
+    "Clothing Color Palette": ["Neutral", "Colorful", "Vibrant", "Monochrome", "Earthy", "Pastel", "Muted"]
+}
+
+def get_characteristics_based_upon_JS_divergence(brand1List, brand2List):
+    js_data_dict = pd.read_excel(os.path.join("data", "excel", "JSDivergence.xlsx"), sheet_name=None)
+    characteristicsList = []
+    for brand1, brand2 in zip(brand1List, brand2List):
+        brands_list = [brand1.lower(), brand2.lower()]
+        listOfJSDiv = []
+
+        for attr in js_data_dict:
+            curr_df = js_data_dict[attr]
+            curr_df = curr_df[curr_df["brand1"].isin(brands_list) & curr_df["brand2"].isin(brands_list)]
+            assert curr_df.shape[0] == 1 # only 1 row for each brand pair
+            listOfJSDiv.append((attr, curr_df["JS"].to_list()[0]))
+        
+        listOfJSDiv.sort(key=lambda x : x[1], reverse=True)
+        total_attrs = len(listOfJSDiv)
+        answer_chars = listOfJSDiv[:2] + listOfJSDiv[-2:] + listOfJSDiv[total_attrs//2:total_attrs//2+2]
+        answer_chars = [FORMAL_CHARACTERISTIC_NAMES[i[0]] for i in answer_chars]
+        characteristicsList.append(answer_chars)
+    return characteristicsList
 
 def get_spreadsheet_data_online():
     import gspread
@@ -55,25 +98,26 @@ def get_spreadsheet_data_local():
 
 def process_local_questions_data(questions_df):
     brand1_names = questions_df["Brand1"].to_list()
-    brand_im1_ids = questions_df["Brand1ImPath"].to_list()
+    brand_im1_folders = questions_df["Brand1ImPath"].to_list()
     # responses1 = [requests.get(im_url.format(img_id), headers={'Authorization': f'Bearer {credentials.token}'})  for img_id in brand_im1_ids]
     # print(resp.status_code for resp in responses1)
     # brand_im1_images = [BytesIO(resp.content) for resp in responses1]
 
-    brand2_names = questions_df["Brand2"].to_list()
-    brand_im1_images = [os.path.join("data", "images", img_id) for img_id in brand_im1_ids]
+    brand_im1_image_lists = [random.sample(os.listdir(os.path.join("data", "images", fldr)), NUM_IMAGES_TO_SAMPLE) for fldr in brand_im1_folders]
+    brand_im1_images = [[os.path.join("data", "images", brand_im1_folders[itr], img_id) for img_id in brand_im1_image_lists[itr]] for itr in range(questions_df.shape[0])]
 
     # print(type(brand_im1_images[0]))
 
-    brand_im2_ids = questions_df["Brand2ImPath"].to_list()
+    brand2_names = questions_df["Brand2"].to_list()
+    brand_im2_folders = questions_df["Brand2ImPath"].to_list()
     # responses2 = [requests.get(im_url.format(img_id), headers={'Authorization': f'Bearer {credentials.token}'})  for img_id in brand_im2_ids]
     # print(resp.status_code for resp in responses2)
     # brand_im2_images = [BytesIO(resp.content) for resp in responses2]
 
-    brand_im2_images = [os.path.join("data", "images", img_id) for img_id in brand_im2_ids]
+    brand_im2_image_lists = [random.sample(os.listdir(os.path.join("data", "images", fldr)), NUM_IMAGES_TO_SAMPLE) for fldr in brand_im2_folders]
+    brand_im2_images = [[os.path.join("data", "images", brand_im2_folders[itr], img_id) for img_id in brand_im2_image_lists[itr]] for itr in range(questions_df.shape[0])]
 
-    brand_options = questions_df["Options"].to_list()
-    brand_options = [eval(i) for i in brand_options]
+    brand_options = get_characteristics_based_upon_JS_divergence(brand1_names, brand2_names)
     return brand1_names, brand2_names, brand_im1_images, brand_im2_images, brand_options
 
 def store_state_on_submit(survey1):
@@ -170,9 +214,6 @@ def get_next_button(label="Next"):
 
 # gdp_df = get_gdp_data()
 
-questions_df = get_spreadsheet_data_local()
-brand1_names, brand2_names, brand_im1_images, brand_im2_images, brand_options = process_local_questions_data(questions_df)
-
 # -----------------------------------------------------------------------------
 # Draw the actual page
 
@@ -183,7 +224,22 @@ st.set_page_config(
 )
 survey = ss.StreamlitSurvey("User Survey")
 
-# to be used to empty the survey form upon submitting
+if "collected_questions_data" not in st.session_state:
+    st.session_state["collected_questions_data"] = False
+
+if not st.session_state["collected_questions_data"]:
+    questions_df = get_spreadsheet_data_local()
+    st.session_state["questions_df"] = questions_df
+    st.session_state["total_questions"] = questions_df.shape[0]
+    brand1_names, brand2_names, brand_im1_images, brand_im2_images, brand_options = process_local_questions_data(questions_df)
+    st.session_state["brand1_names"] = brand1_names
+    st.session_state["brand2_names"] = brand2_names
+    st.session_state["brand_im1_images"] = brand_im1_images
+    st.session_state["brand_im2_images"] = brand_im2_images
+    st.session_state["brand_options"] = brand_options
+    st.session_state["collected_questions_data"] = True
+
+# will be used to empty the survey form upon submitting
 empty_placeholder = st.empty()
 if "submitted" not in st.session_state:
     st.session_state["submitted"] = False
@@ -216,23 +272,23 @@ In each of the following questions, you'll be shown two sets of (advertisement) 
 Question_template = '''
 Choose 2 most distinctive characteristics between the below sets of images.
 '''
-Question_components = [ss.MultiSelect(survey=survey, label="Select in order of distinctiveness (most distinctive first):", id=f"Characteristic_component_{itr}", key=f"Characteristic_component_{itr}", options=brand_options[itr]) for itr in range(questions_df.shape[0])]
+Question_components = [ss.MultiSelect(survey=survey, label="Select in order of distinctiveness (most distinctive first):", id=f"Characteristic_component_{itr}", key=f"Characteristic_component_{itr}", options=st.session_state["brand_options"][itr]) for itr in range(st.session_state["total_questions"])]
 
 FollowUp_Question_template = '''
 {0} in {1} images'''
-# st.session_state["Brand1_FollowUp_Char1_Options"] = [["default"] for _ in range(questions_df.shape[0])]
-# st.session_state["Brand2_FollowUp_Char1_Options"] = [["default"] for _ in range(questions_df.shape[0])]
-# st.session_state["Brand1_FollowUp_Char2_Options"] = [["default"] for _ in range(questions_df.shape[0])]
-# st.session_state["Brand2_FollowUp_Char2_Options"] = [["default"] for _ in range(questions_df.shape[0])]
-Brand1_FollowUp_Char1_components = [None for itr in range(questions_df.shape[0])]
+# st.session_state["Brand1_FollowUp_Char1_Options"] = [["default"] for _ in range(st.session_state["total_questions"])]
+# st.session_state["Brand2_FollowUp_Char1_Options"] = [["default"] for _ in range(st.session_state["total_questions"])]
+# st.session_state["Brand1_FollowUp_Char2_Options"] = [["default"] for _ in range(st.session_state["total_questions"])]
+# st.session_state["Brand2_FollowUp_Char2_Options"] = [["default"] for _ in range(st.session_state["total_questions"])]
+Brand1_FollowUp_Char1_components = [None]*st.session_state["total_questions"]
 
-Brand2_FollowUp_Char1_components = [None for itr in range(questions_df.shape[0])]
+Brand2_FollowUp_Char1_components = [None]*st.session_state["total_questions"]
 
-Brand1_FollowUp_Char2_components = [None for itr in range(questions_df.shape[0])]
+Brand1_FollowUp_Char2_components = [None]*st.session_state["total_questions"]
 
-Brand2_FollowUp_Char2_components = [None for itr in range(questions_df.shape[0])]
+Brand2_FollowUp_Char2_components = [None]*st.session_state["total_questions"]
     
-pages = survey.pages(questions_df.shape[0]+2, progress_bar=True, on_submit=lambda: store_state_on_submit(survey1=survey))
+pages = survey.pages(st.session_state["total_questions"]+2, progress_bar=True, on_submit=lambda: store_state_on_submit(survey1=survey))
 
 pages.submit_button = get_submit_button()
 pages.prev_button = get_previous_button()
@@ -254,31 +310,39 @@ with pages:
             with empty_placeholder.container():
                 # use empty placeholder only for last page
                 st.write(Question_template)
-                st.image(brand_im1_images[pages.current-2], caption=f"{brand1_names[pages.current-2]}")
-                st.image(brand_im2_images[pages.current-2], caption=f"{brand2_names[pages.current-2]}")
+                st.subheader(f"{st.session_state['brand1_names'][pages.current-2]}")
+                cols1 = st.columns(NUM_IMAGES_TO_SAMPLE, vertical_alignment="bottom")
+                for idx in range(NUM_IMAGES_TO_SAMPLE):
+                    cols1[idx].image(st.session_state["brand_im1_images"][pages.current-2][idx], use_column_width=True)
+                # st.image(st.session_state["brand_im1_images"][pages.current-2], caption=f"{st.session_state['brand1_names'][pages.current-2]}")
+                st.subheader(f"{st.session_state['brand2_names'][pages.current-2]}")
+                cols2 = st.columns(NUM_IMAGES_TO_SAMPLE, vertical_alignment="bottom")
+                for idx in range(NUM_IMAGES_TO_SAMPLE):
+                    cols2[idx].image(st.session_state["brand_im2_images"][pages.current-2][idx], use_column_width=True)
+                # st.image(st.session_state["brand_im2_images"][pages.current-2], caption=f"{st.session_state['brand2_names'][pages.current-2]}")
                 characteristic_value = Question_components[pages.current-2].display()
                 if len(characteristic_value) != 2:
                     st.session_state["selected_chars"] = False
                     st.error(f"Please select 2 options.")
                 else:
                     st.session_state["selected_chars"] = True
-                    # st.session_state["Brand1_FollowUp_Char1_Options"][pages.current-2] = get_characteristics_options(characteristic_value[0])
-                    # st.session_state["Brand1_FollowUp_Char2_Options"][pages.current-2] = get_characteristics_options(characteristic_value[1])
-                    # st.session_state["Brand2_FollowUp_Char1_Options"][pages.current-2] = get_characteristics_options(characteristic_value[0])
-                    # st.session_state["Brand2_FollowUp_Char2_Options"][pages.current-2] = get_characteristics_options(characteristic_value[1])
+                    # st.session_state["Brand1_FollowUp_Char1_Options"][pages.current-2] = CHARACTERISTIC_OPTIONS_DICT[characteristic_value[0]]
+                    # st.session_state["Brand1_FollowUp_Char2_Options"][pages.current-2] = CHARACTERISTIC_OPTIONS_DICT[characteristic_value[1]]
+                    # st.session_state["Brand2_FollowUp_Char1_Options"][pages.current-2] = CHARACTERISTIC_OPTIONS_DICT[characteristic_value[0]]
+                    # st.session_state["Brand2_FollowUp_Char2_Options"][pages.current-2] = CHARACTERISTIC_OPTIONS_DICT[characteristic_value[1]]
 
-                    Brand1_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[0]), key=f"Brand1_FollowUp_Char1_component_{pages.current-2}")
+                    Brand1_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=CHARACTERISTIC_OPTIONS_DICT[characteristic_value[0]], key=f"Brand1_FollowUp_Char1_component_{pages.current-2}")
 
-                    Brand2_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[0]), key=f"Brand2_FollowUp_Char1_component_{pages.current-2}")
+                    Brand2_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=CHARACTERISTIC_OPTIONS_DICT[characteristic_value[0]], key=f"Brand2_FollowUp_Char1_component_{pages.current-2}")
 
-                    Brand1_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[1]), key=f"Brand1_FollowUp_Char2_component_{pages.current-2}")
+                    Brand1_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=CHARACTERISTIC_OPTIONS_DICT[characteristic_value[1]], key=f"Brand1_FollowUp_Char2_component_{pages.current-2}")
 
-                    Brand2_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[1]), key=f"Brand2_FollowUp_Char2_component_{pages.current-2}")
+                    Brand2_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=CHARACTERISTIC_OPTIONS_DICT[characteristic_value[1]], key=f"Brand2_FollowUp_Char2_component_{pages.current-2}")
 
-                    st.write(FollowUp_Question_template.format(characteristic_value[0], brand1_names[pages.current-2]))
+                    st.write(FollowUp_Question_template.format(characteristic_value[0], st.session_state["brand1_names"][pages.current-2]))
                     brand1_char1_value = Brand1_FollowUp_Char1_components[pages.current-2].display()
 
-                    st.write(FollowUp_Question_template.format(characteristic_value[0], brand2_names[pages.current-2]))
+                    st.write(FollowUp_Question_template.format(characteristic_value[0], st.session_state["brand2_names"][pages.current-2]))
                     brand2_char1_value = Brand2_FollowUp_Char1_components[pages.current-2].display()
 
                     if brand1_char1_value == brand2_char1_value:
@@ -287,10 +351,10 @@ with pages:
                     else:
                         st.session_state["char1_different"] = True
 
-                    st.write(FollowUp_Question_template.format(characteristic_value[1], brand1_names[pages.current-2]))
+                    st.write(FollowUp_Question_template.format(characteristic_value[1], st.session_state["brand1_names"][pages.current-2]))
                     brand1_char2_value = Brand1_FollowUp_Char2_components[pages.current-2].display()
 
-                    st.write(FollowUp_Question_template.format(characteristic_value[1], brand2_names[pages.current-2]))
+                    st.write(FollowUp_Question_template.format(characteristic_value[1], st.session_state["brand2_names"][pages.current-2]))
                     brand2_char2_value = Brand2_FollowUp_Char2_components[pages.current-2].display()
 
                     if brand1_char2_value == brand2_char2_value:
@@ -305,31 +369,39 @@ with pages:
         else:
             # don't use empty placeholder for other pages
             st.write(Question_template)
-            st.image(brand_im1_images[pages.current-2], caption=f"{brand1_names[pages.current-2]}")
-            st.image(brand_im2_images[pages.current-2], caption=f"{brand2_names[pages.current-2]}")
+            st.subheader(f"{st.session_state['brand1_names'][pages.current-2]}")
+            cols1 = st.columns(NUM_IMAGES_TO_SAMPLE, vertical_alignment="bottom")
+            for idx in range(NUM_IMAGES_TO_SAMPLE):
+                cols1[idx].image(st.session_state["brand_im1_images"][pages.current-2][idx], use_column_width=True)
+            # st.image(st.session_state["brand_im1_images"][pages.current-2], caption=f"{st.session_state['brand1_names'][pages.current-2]}")
+            st.subheader(f"{st.session_state['brand2_names'][pages.current-2]}")
+            cols2 = st.columns(NUM_IMAGES_TO_SAMPLE, vertical_alignment="bottom")
+            for idx in range(NUM_IMAGES_TO_SAMPLE):
+                cols2[idx].image(st.session_state["brand_im2_images"][pages.current-2][idx], use_column_width=True)
+            # st.image(st.session_state["brand_im2_images"][pages.current-2], caption=f"{st.session_state['brand2_names'][pages.current-2]}")
             characteristic_value = Question_components[pages.current-2].display()
             if len(characteristic_value) != 2:
                 st.session_state["selected_chars"] = False
                 st.error(f"Please select 2 options.")
             else:
                 st.session_state["selected_chars"] = True
-                # st.session_state["Brand1_FollowUp_Char1_Options"][pages.current-2] = get_characteristics_options(characteristic_value[0])
-                # st.session_state["Brand1_FollowUp_Char2_Options"][pages.current-2] = get_characteristics_options(characteristic_value[1])
-                # st.session_state["Brand2_FollowUp_Char1_Options"][pages.current-2] = get_characteristics_options(characteristic_value[0])
-                # st.session_state["Brand2_FollowUp_Char2_Options"][pages.current-2] = get_characteristics_options(characteristic_value[1])
+                # st.session_state["Brand1_FollowUp_Char1_Options"][pages.current-2] = CHARACTERISTIC_OPTIONS_DICT[characteristic_value[0]]
+                # st.session_state["Brand1_FollowUp_Char2_Options"][pages.current-2] = CHARACTERISTIC_OPTIONS_DICT[characteristic_value[1]]
+                # st.session_state["Brand2_FollowUp_Char1_Options"][pages.current-2] = CHARACTERISTIC_OPTIONS_DICT[characteristic_value[0]]
+                # st.session_state["Brand2_FollowUp_Char2_Options"][pages.current-2] = CHARACTERISTIC_OPTIONS_DICT[characteristic_value[1]]
 
-                Brand1_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[0]), key=f"Brand1_FollowUp_Char1_component_{pages.current-2}")
+                Brand1_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=CHARACTERISTIC_OPTIONS_DICT[characteristic_value[0]], key=f"Brand1_FollowUp_Char1_component_{pages.current-2}")
 
-                Brand2_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[0]), key=f"Brand2_FollowUp_Char1_component_{pages.current-2}")
+                Brand2_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=CHARACTERISTIC_OPTIONS_DICT[characteristic_value[0]], key=f"Brand2_FollowUp_Char1_component_{pages.current-2}")
 
-                Brand1_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[1]), key=f"Brand1_FollowUp_Char2_component_{pages.current-2}")
+                Brand1_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=CHARACTERISTIC_OPTIONS_DICT[characteristic_value[1]], key=f"Brand1_FollowUp_Char2_component_{pages.current-2}")
 
-                Brand2_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[1]), key=f"Brand2_FollowUp_Char2_component_{pages.current-2}")
+                Brand2_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=CHARACTERISTIC_OPTIONS_DICT[characteristic_value[1]], key=f"Brand2_FollowUp_Char2_component_{pages.current-2}")
 
-                st.write(FollowUp_Question_template.format(characteristic_value[0], brand1_names[pages.current-2]))
+                st.write(FollowUp_Question_template.format(characteristic_value[0], st.session_state["brand1_names"][pages.current-2]))
                 brand1_char1_value = Brand1_FollowUp_Char1_components[pages.current-2].display()
 
-                st.write(FollowUp_Question_template.format(characteristic_value[0], brand2_names[pages.current-2]))
+                st.write(FollowUp_Question_template.format(characteristic_value[0], st.session_state["brand2_names"][pages.current-2]))
                 brand2_char1_value = Brand2_FollowUp_Char1_components[pages.current-2].display()
 
                 if brand1_char1_value == brand2_char1_value:
@@ -338,10 +410,10 @@ with pages:
                 else:
                     st.session_state["char1_different"] = True
 
-                st.write(FollowUp_Question_template.format(characteristic_value[1], brand1_names[pages.current-2]))
+                st.write(FollowUp_Question_template.format(characteristic_value[1], st.session_state["brand1_names"][pages.current-2]))
                 brand1_char2_value = Brand1_FollowUp_Char2_components[pages.current-2].display()
 
-                st.write(FollowUp_Question_template.format(characteristic_value[1], brand2_names[pages.current-2]))
+                st.write(FollowUp_Question_template.format(characteristic_value[1], st.session_state["brand2_names"][pages.current-2]))
                 brand2_char2_value = Brand2_FollowUp_Char2_components[pages.current-2].display()
 
                 if brand1_char2_value == brand2_char2_value:
