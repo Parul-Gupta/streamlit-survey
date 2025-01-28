@@ -1,2 +1,6 @@
 streamlit
+streamlit-survey
 pandas
+gspread
+gspread-dataframe
+oauth2client
