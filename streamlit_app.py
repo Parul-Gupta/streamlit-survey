@@ -1,12 +1,9 @@
 import streamlit as st
 import pandas as pd
-from openpyxl import load_workbook
-import math
-from io import BytesIO
-from pathlib import Path
 import os, json
 
 import streamlit_survey as ss
+from streamlit_gsheets import GSheetsConnection
 
 # -----------------------------------------------------------------------------
 # Declare some useful functions.
@@ -84,17 +81,17 @@ def store_state_on_submit(survey1):
 
     diction = {k:survey_json[k]["value"] for k in survey_json}
 
-    output_sheet_df = pd.read_excel(os.path.join("data", "excel", "Streamlit Survey Sheet.xlsx"), sheet_name="Output Sheet")
-    if output_sheet_df.empty:
-        listOfDicts = [diction]
-    else:
-        listOfDicts = output_sheet_df.to_dict(orient="records")
-        listOfDicts.append(diction)
-    output_sheet_df = pd.DataFrame(listOfDicts, index=None)
+    # can't do this because the storage is not persistent across sessions
+    # output_sheet_df = pd.read_excel(os.path.join("data", "excel", "Streamlit Survey Sheet.xlsx"), sheet_name="Output Sheet")
 
-    with pd.ExcelWriter(os.path.join("data", "excel", "Streamlit Survey Sheet.xlsx"), engine='openpyxl', if_sheet_exists="overlay", mode="a") as writer:
-        output_sheet_df.to_excel(excel_writer=writer, sheet_name="Output Sheet", index=None)
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    output_sheet_df = conn.read(worksheet="Output Sheet")
+    output_sheet_df = pd.concat([output_sheet_df, pd.DataFrame([diction])], ignore_index=True)
 
+    # with pd.ExcelWriter(os.path.join("data", "excel", "Streamlit Survey Sheet.xlsx"), engine='openpyxl', if_sheet_exists="overlay", mode="a") as writer:
+    #     output_sheet_df.to_excel(excel_writer=writer, sheet_name="Output Sheet", index=None)
+
+    conn.update(worksheet="Output Sheet", data=output_sheet_df)
     st.success("Survey submitted successfully!")
     return
 

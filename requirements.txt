@@ -1,7 +1,6 @@
 streamlit
 streamlit-survey
 pandas
-gspread
+st-gsheets-connection
 gspread-dataframe
 oauth2client
-openpyxl
