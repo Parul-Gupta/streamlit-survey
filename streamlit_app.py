@@ -92,8 +92,36 @@ def store_state_on_submit(survey1):
     #     output_sheet_df.to_excel(excel_writer=writer, sheet_name="Output Sheet", index=None)
 
     conn.update(worksheet="Output Sheet", data=output_sheet_df)
-    st.success("Survey submitted successfully!")
+    st.cache_data.clear()
+    st.session_state["submitted"] = True
+    st.rerun()
     return
+
+def get_submit_button(label="Submit"):
+    return lambda pages: st.button(
+        label=label,
+        use_container_width=True,
+        key=f"{pages.current_page_key}_btn_next",
+        disabled=st.session_state["submitted"] or not st.session_state["selected_chars"] or not st.session_state["char1_different"] or not st.session_state["char2_different"]
+    )
+
+def get_previous_button(label="Previous"):
+    return lambda pages: st.button(
+        label,
+        use_container_width=True,
+        on_click=pages.previous,
+        disabled=pages.current == 0 or st.session_state["submitted"],
+        key=f"{pages.current_page_key}_btn_prev",
+    )
+
+def get_next_button(label="Next"):
+    return lambda pages: st.button(
+        label,
+        use_container_width=True,
+        on_click=pages.next,
+        disabled=(pages.current == pages.n_pages - 1) or (pages.current == 0 and not st.session_state["agree_value"]) or (pages.current > 1 and (not st.session_state["selected_chars"] or not st.session_state["char1_different"] or not st.session_state["char2_different"]) ),
+        key=f"{pages.current_page_key}_btn_next",
+    )
 
 # @st.cache_data
 # def get_gdp_data():
@@ -155,6 +183,11 @@ st.set_page_config(
 )
 survey = ss.StreamlitSurvey("User Survey")
 
+# to be used to empty the survey form upon submitting
+empty_placeholder = st.empty()
+if "submitted" not in st.session_state:
+    st.session_state["submitted"] = False
+
 # Set the title that appears at the top of the page.
 First_Title = '''
 # :earth_americas: BrandFusion: Aligning Image Generation with Brand Styles (User Survey)
@@ -201,52 +234,122 @@ Brand2_FollowUp_Char2_components = [None for itr in range(questions_df.shape[0])
     
 pages = survey.pages(questions_df.shape[0]+2, progress_bar=True, on_submit=lambda: store_state_on_submit(survey1=survey))
 
+pages.submit_button = get_submit_button()
+pages.prev_button = get_previous_button()
+pages.next_button = get_next_button()
+
 with pages:
     if pages.current == 0:
         st.write(First_Title)
         agree_value = Agree_Box.display()
         if not agree_value:
+            st.session_state["agree_value"] = False
             st.error("Please agree to the terms and conditions before proceeding")
+        else:
+            st.session_state["agree_value"] = True
     elif pages.current == 1:
         st.write(Second_Title)
     else:
-        st.write(Question_template)
-        st.image(brand_im1_images[pages.current-2], caption=f"{brand1_names[pages.current-2]}")
-        st.image(brand_im2_images[pages.current-2], caption=f"{brand2_names[pages.current-2]}")
-        characteristic_value = Question_components[pages.current-2].display()
-        if len(characteristic_value) != 2:
-            st.error(f"Please select 2 options.")
+        if pages.current == pages.n_pages-1:
+            with empty_placeholder.container():
+                # use empty placeholder only for last page
+                st.write(Question_template)
+                st.image(brand_im1_images[pages.current-2], caption=f"{brand1_names[pages.current-2]}")
+                st.image(brand_im2_images[pages.current-2], caption=f"{brand2_names[pages.current-2]}")
+                characteristic_value = Question_components[pages.current-2].display()
+                if len(characteristic_value) != 2:
+                    st.session_state["selected_chars"] = False
+                    st.error(f"Please select 2 options.")
+                else:
+                    st.session_state["selected_chars"] = True
+                    # st.session_state["Brand1_FollowUp_Char1_Options"][pages.current-2] = get_characteristics_options(characteristic_value[0])
+                    # st.session_state["Brand1_FollowUp_Char2_Options"][pages.current-2] = get_characteristics_options(characteristic_value[1])
+                    # st.session_state["Brand2_FollowUp_Char1_Options"][pages.current-2] = get_characteristics_options(characteristic_value[0])
+                    # st.session_state["Brand2_FollowUp_Char2_Options"][pages.current-2] = get_characteristics_options(characteristic_value[1])
+
+                    Brand1_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[0]), key=f"Brand1_FollowUp_Char1_component_{pages.current-2}")
+
+                    Brand2_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[0]), key=f"Brand2_FollowUp_Char1_component_{pages.current-2}")
+
+                    Brand1_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[1]), key=f"Brand1_FollowUp_Char2_component_{pages.current-2}")
+
+                    Brand2_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[1]), key=f"Brand2_FollowUp_Char2_component_{pages.current-2}")
+
+                    st.write(FollowUp_Question_template.format(characteristic_value[0], brand1_names[pages.current-2]))
+                    brand1_char1_value = Brand1_FollowUp_Char1_components[pages.current-2].display()
+
+                    st.write(FollowUp_Question_template.format(characteristic_value[0], brand2_names[pages.current-2]))
+                    brand2_char1_value = Brand2_FollowUp_Char1_components[pages.current-2].display()
+
+                    if brand1_char1_value == brand2_char1_value:
+                        st.session_state["char1_different"] = False
+                        st.error(f"The {characteristic_value[0]} for both the brands should be different!")
+                    else:
+                        st.session_state["char1_different"] = True
+
+                    st.write(FollowUp_Question_template.format(characteristic_value[1], brand1_names[pages.current-2]))
+                    brand1_char2_value = Brand1_FollowUp_Char2_components[pages.current-2].display()
+
+                    st.write(FollowUp_Question_template.format(characteristic_value[1], brand2_names[pages.current-2]))
+                    brand2_char2_value = Brand2_FollowUp_Char2_components[pages.current-2].display()
+
+                    if brand1_char2_value == brand2_char2_value:
+                        st.session_state["char2_different"] = False
+                        st.error(f"The {characteristic_value[1]} for both the brands should be different!")
+                    else:
+                        st.session_state["char2_different"] = True
+            
+            if st.session_state["submitted"] == True:
+                empty_placeholder.empty()
+                st.success("Survey submitted successfully!")
         else:
-            # st.session_state["Brand1_FollowUp_Char1_Options"][pages.current-2] = get_characteristics_options(characteristic_value[0])
-            # st.session_state["Brand1_FollowUp_Char2_Options"][pages.current-2] = get_characteristics_options(characteristic_value[1])
-            # st.session_state["Brand2_FollowUp_Char1_Options"][pages.current-2] = get_characteristics_options(characteristic_value[0])
-            # st.session_state["Brand2_FollowUp_Char2_Options"][pages.current-2] = get_characteristics_options(characteristic_value[1])
+            # don't use empty placeholder for other pages
+            st.write(Question_template)
+            st.image(brand_im1_images[pages.current-2], caption=f"{brand1_names[pages.current-2]}")
+            st.image(brand_im2_images[pages.current-2], caption=f"{brand2_names[pages.current-2]}")
+            characteristic_value = Question_components[pages.current-2].display()
+            if len(characteristic_value) != 2:
+                st.session_state["selected_chars"] = False
+                st.error(f"Please select 2 options.")
+            else:
+                st.session_state["selected_chars"] = True
+                # st.session_state["Brand1_FollowUp_Char1_Options"][pages.current-2] = get_characteristics_options(characteristic_value[0])
+                # st.session_state["Brand1_FollowUp_Char2_Options"][pages.current-2] = get_characteristics_options(characteristic_value[1])
+                # st.session_state["Brand2_FollowUp_Char1_Options"][pages.current-2] = get_characteristics_options(characteristic_value[0])
+                # st.session_state["Brand2_FollowUp_Char2_Options"][pages.current-2] = get_characteristics_options(characteristic_value[1])
 
-            Brand1_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[0]), key=f"Brand1_FollowUp_Char1_component_{pages.current-2}")
+                Brand1_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[0]), key=f"Brand1_FollowUp_Char1_component_{pages.current-2}")
 
-            Brand2_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[0]), key=f"Brand2_FollowUp_Char1_component_{pages.current-2}")
+                Brand2_FollowUp_Char1_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char1_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[0]), key=f"Brand2_FollowUp_Char1_component_{pages.current-2}")
 
-            Brand1_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[1]), key=f"Brand1_FollowUp_Char2_component_{pages.current-2}")
+                Brand1_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand1_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[1]), key=f"Brand1_FollowUp_Char2_component_{pages.current-2}")
 
-            Brand2_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[1]), key=f"Brand2_FollowUp_Char2_component_{pages.current-2}")
+                Brand2_FollowUp_Char2_components[pages.current-2] = ss.SelectBox(survey=survey, label=f"Brand2_FollowUp_Char2_component_{pages.current-2}", label_visibility="collapsed", options=get_characteristics_options(characteristic_value[1]), key=f"Brand2_FollowUp_Char2_component_{pages.current-2}")
 
-            st.write(FollowUp_Question_template.format(characteristic_value[0], brand1_names[pages.current-2]))
-            brand1_char1_value = Brand1_FollowUp_Char1_components[pages.current-2].display()
+                st.write(FollowUp_Question_template.format(characteristic_value[0], brand1_names[pages.current-2]))
+                brand1_char1_value = Brand1_FollowUp_Char1_components[pages.current-2].display()
 
-            st.write(FollowUp_Question_template.format(characteristic_value[0], brand2_names[pages.current-2]))
-            brand2_char1_value = Brand2_FollowUp_Char1_components[pages.current-2].display()
+                st.write(FollowUp_Question_template.format(characteristic_value[0], brand2_names[pages.current-2]))
+                brand2_char1_value = Brand2_FollowUp_Char1_components[pages.current-2].display()
 
-            if brand1_char1_value == brand2_char1_value:
-                st.error(f"The {characteristic_value[0]} for both the brands should be different!")
+                if brand1_char1_value == brand2_char1_value:
+                    st.session_state["char1_different"] = False
+                    st.error(f"The {characteristic_value[0]} for both the brands should be different!")
+                else:
+                    st.session_state["char1_different"] = True
 
-            st.write(FollowUp_Question_template.format(characteristic_value[1], brand1_names[pages.current-2]))
-            brand1_char2_value = Brand1_FollowUp_Char2_components[pages.current-2].display()
+                st.write(FollowUp_Question_template.format(characteristic_value[1], brand1_names[pages.current-2]))
+                brand1_char2_value = Brand1_FollowUp_Char2_components[pages.current-2].display()
 
-            st.write(FollowUp_Question_template.format(characteristic_value[1], brand2_names[pages.current-2]))
-            brand2_char2_value = Brand2_FollowUp_Char2_components[pages.current-2].display()
+                st.write(FollowUp_Question_template.format(characteristic_value[1], brand2_names[pages.current-2]))
+                brand2_char2_value = Brand2_FollowUp_Char2_components[pages.current-2].display()
 
-            if brand1_char2_value == brand2_char2_value:
-                st.error(f"The {characteristic_value[1]} for both the brands should be different!")
+                if brand1_char2_value == brand2_char2_value:
+                    st.session_state["char2_different"] = False
+                    st.error(f"The {characteristic_value[1]} for both the brands should be different!")
+                else:
+                    st.session_state["char2_different"] = True
+            
             
 
 # Create Streamlit survey form
