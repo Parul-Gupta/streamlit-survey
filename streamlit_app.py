@@ -264,7 +264,7 @@ Contact Details: For further details about the research and how your responses w
 ''
 ''
 
-Agree_Box = ss.CheckBox(survey=survey, label="I fit the eligibility criteria and agree to participate in the survey.", id="Agree_box", value=True)
+Agree_Box = ss.CheckBox(survey=survey, label="I fit the eligibility criteria and agree to participate in the survey.", id="Agree_box", value=False)
 Second_Title = '''
 In each of the following questions, you'll be shown two sets of (advertisement) images from two different brands of the same sector (e.g. 2 Fashion brands, 2 Airlines brands etc.). Then, from a given list of characteristics, you'll need to choose which are the most differentiating characteristics between the two sets of images. Also, you'll need to assign the labels per characteristic which are relevant to each set of images.\n
 '''
@@ -313,12 +313,12 @@ with pages:
                 st.subheader(f"{st.session_state['brand1_names'][pages.current-2]}")
                 cols1 = st.columns(NUM_IMAGES_TO_SAMPLE, vertical_alignment="bottom")
                 for idx in range(NUM_IMAGES_TO_SAMPLE):
-                    cols1[idx].image(st.session_state["brand_im1_images"][pages.current-2][idx], use_column_width=True)
+                    cols1[idx].image(st.session_state["brand_im1_images"][pages.current-2][idx], use_container_width=True)
                 # st.image(st.session_state["brand_im1_images"][pages.current-2], caption=f"{st.session_state['brand1_names'][pages.current-2]}")
                 st.subheader(f"{st.session_state['brand2_names'][pages.current-2]}")
                 cols2 = st.columns(NUM_IMAGES_TO_SAMPLE, vertical_alignment="bottom")
                 for idx in range(NUM_IMAGES_TO_SAMPLE):
-                    cols2[idx].image(st.session_state["brand_im2_images"][pages.current-2][idx], use_column_width=True)
+                    cols2[idx].image(st.session_state["brand_im2_images"][pages.current-2][idx], use_container_width=True)
                 # st.image(st.session_state["brand_im2_images"][pages.current-2], caption=f"{st.session_state['brand2_names'][pages.current-2]}")
                 characteristic_value = Question_components[pages.current-2].display()
                 if len(characteristic_value) != 2:
@@ -372,12 +372,12 @@ with pages:
             st.subheader(f"{st.session_state['brand1_names'][pages.current-2]}")
             cols1 = st.columns(NUM_IMAGES_TO_SAMPLE, vertical_alignment="bottom")
             for idx in range(NUM_IMAGES_TO_SAMPLE):
-                cols1[idx].image(st.session_state["brand_im1_images"][pages.current-2][idx], use_column_width=True)
+                cols1[idx].image(st.session_state["brand_im1_images"][pages.current-2][idx], use_container_width=True)
             # st.image(st.session_state["brand_im1_images"][pages.current-2], caption=f"{st.session_state['brand1_names'][pages.current-2]}")
             st.subheader(f"{st.session_state['brand2_names'][pages.current-2]}")
             cols2 = st.columns(NUM_IMAGES_TO_SAMPLE, vertical_alignment="bottom")
             for idx in range(NUM_IMAGES_TO_SAMPLE):
-                cols2[idx].image(st.session_state["brand_im2_images"][pages.current-2][idx], use_column_width=True)
+                cols2[idx].image(st.session_state["brand_im2_images"][pages.current-2][idx], use_container_width=True)
             # st.image(st.session_state["brand_im2_images"][pages.current-2], caption=f"{st.session_state['brand2_names'][pages.current-2]}")
             characteristic_value = Question_components[pages.current-2].display()
             if len(characteristic_value) != 2:
