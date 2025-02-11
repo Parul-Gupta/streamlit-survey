@@ -9,7 +9,7 @@ from streamlit_gsheets import GSheetsConnection
 # -----------------------------------------------------------------------------
 # Declare some useful functions.
 
-NUM_IMAGES_TO_SAMPLE = 5
+NUM_IMAGES_TO_SAMPLE = 10
 FORMAL_CHARACTERISTIC_NAMES = {
     "image_lighting": "Image Lighting",
     "perspective": "Perspective",
@@ -256,8 +256,9 @@ Data Collection and Storage: The survey is anonymous, and only your responses to
 Contact Details: For further details about the research and how your responses will be used, please contact any of the following people:\n
 1. Parul (parul@monash.edu)\n
 2. Abhinav Dhall (abhinav.dhall@monash.edu)\n
-3. Varun Khurana\n
-4. Yaman Kumar\n
+3. Varun Khurana (varunkhurana@adobe.com)\n
+4. Yaman Kumar (ykumar@adobe.com)\n
+5. Jayakumar Subramanian (jasubram@adobe.com)\n
 '''
 
 # Add some spacing
@@ -266,7 +267,13 @@ Contact Details: For further details about the research and how your responses w
 
 Agree_Box = ss.CheckBox(survey=survey, label="I fit the eligibility criteria and agree to participate in the survey.", id="Agree_box", value=False)
 Second_Title = '''
-In each of the following questions, you'll be shown two sets of (advertisement) images from two different brands of the same sector (e.g. 2 Fashion brands, 2 Airlines brands etc.). Then, from a given list of characteristics, you'll need to choose which are the most differentiating characteristics between the two sets of images. Also, you'll need to assign the labels per characteristic which are relevant to each set of images.\n
+In each of the following questions, you'll be shown two sets of (advertisement) images from two different brands of the same sector (e.g. 2 Fashion brands, 2 Airlines brands etc.). Then, from a given list of characteristics, you'll need to choose which are the most differentiating characteristics between the two sets of images. Also, you'll need to assign the labels per characteristic which are relevant to each set of images.\n'''
+Third_Title = '''
+For example: Given the following two sets of images from the brands brand1 and brand2 (sector brands)\n
+These images are different in terms of char1 , char2 and char3, because while brand1 images have label1 char1, label2 char2, label3 char3;\n
+the images of brand2 on the other hand have label4 char1, label5 char2 and label6 char3.\n
+Therefore, one valid response would be char1, char2 and label1, label4 and label2, label5.\n
+To get a better understanding of the possible characteristics, we encourage you to look at this doc with example images.
 '''
 
 Question_template = '''
@@ -305,6 +312,7 @@ with pages:
             st.session_state["agree_value"] = True
     elif pages.current == 1:
         st.write(Second_Title)
+        st.write(Third_Title)
     else:
         if pages.current == pages.n_pages-1:
             with empty_placeholder.container():
